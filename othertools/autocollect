@@ -1,0 +1,37 @@
+# autocollect: colllect different kinds of information from all nodes in the colony
+# Author: Zihao Ye
+# Time of creation: Jan, 2023
+
+# configuration part
+account=***  # 账号名
+outputdir=/home/$account/g09  # /home/lizm/g09 需要提取到哪个文件夹
+tmpdir=/tmp/$account/  # 中间文件所在文件夹
+outputfile=*.log  # 需要复制的文件名后缀
+passwd=********  # 账号登录密码
+
+# run part
+qstat > autocollect.log
+number=1
+sed -i '1,2d' autocollect.log
+
+read -p 'please input model jobname: ' modelname
+
+while read rows
+do
+	row_arr=(`echo ${rows} |tr ' ' ' '`)
+	jobid=${row_arr[0]}
+	jobname=${row_arr[2]}
+	host=${row_arr[7]}
+	host=${host#*@}
+	if [[ "$jobname" == "$modelname"* ]];then
+		sshpass -p $passwd ssh $account@$host cp $tmpdir$jobid/$outputfile $outputdir </dev/null
+		echo $number
+	        echo $jobid $jobname $host
+	else
+		echo $number
+                echo $jobid $jobname $host
+		echo skipped
+	fi
+	((number=number+1))
+done < autocollect.log 
+rm -f autocollect.log

@@ -1,0 +1,42 @@
+#!/bin/bash
+###User's Input File and Output File
+INPUTNAME=$JOBNAME.gjf
+CHKNAME=$JOBNAME.chk
+OUTPUTNAME=$JOBNAME.log
+INPUTDIR=$DIR_NAME
+echo $HOSTNAME
+echo $INPUTDIR
+###Copy file to local filesystem /tmp
+JOB_RUN_DIR=/tmp/$USER/$JOB_ID
+mkdir -p $JOB_RUN_DIR
+if [ -f $CHKNAME ]; then
+  /bin/cp $INPUTDIR/$CHKNAME $JOB_RUN_DIR/
+fi
+
+if [ -f $OUTPUTNAME ]; then
+  /bin/cp $INPUTDIR/$OUTPUTNAME $JOB_RUN_DIR/
+fi
+
+/bin/cp  $INPUTDIR/$INPUTNAME $JOB_RUN_DIR/
+
+
+cd $JOB_RUN_DIR
+
+## G16 enviroment
+g16root=/software/g16.b01
+source $g16root/g16/bsd/g16.profile
+export GAUSS_SCRDIR=$JOB_RUN_DIR 
+
+g16 <$INPUTNAME > $OUTPUTNAME
+for cfile in `ls *.chk`; do
+  formchk $cfile
+done
+
+
+## Copy file from local /tmp to NFS filesystem /home
+/bin/rm $JOB_RUN_DIR/Gau-*.rwf
+cp -rf $JOB_RUN_DIR $INPUTDIR/
+
+rm -rf $INPUTDIR/*o$JOB_ID
+# rm -rf $INPUTDIR/*po$JOB_ID
+rm -rf $JOB_RUN_DIR/

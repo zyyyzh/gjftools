@@ -1,0 +1,55 @@
+#!/bin/bash
+###User's Input File and Output File
+INPUTNAME=$JOBNAME.xyz
+INPUTCONS=$JOBNAME.cinp
+INPUTDIR=$DIR_NAME
+cinp=`cat $INPUTCONS`
+echo $HOSTNAME
+echo $INPUTDIR
+echo $cinp
+###Copy file to local filesystem /tmp
+JOB_RUN_DIR=/tmp/$USER/$JOB_ID
+mkdir -p $JOB_RUN_DIR
+
+/bin/cp $INPUTDIR/$INPUTNAME $JOB_RUN_DIR/
+
+cd $JOB_RUN_DIR
+
+## xTB environment
+export PATH=$PATH:/software/xtb/bin
+export XTBPATH=/software/xtb/share/xtb
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+export OMP_STACKSIZE=1000m
+ulimit -s unlimited
+
+if [ -z $CHARGE ]; then
+  $CHARGE=0
+fi
+
+if [ -z $cinp ]; then
+  ## no constraint
+  ## run xTB pre-optimization
+  xtb $INPUTNAME --opt --gfn2 --chrg $CHARGE
+  ## run CREST program
+  crest xtbopt.xyz --T 4 --v3 --ewin 12 --rthr 0.35 --ethr 0.2 --chrg $CHARGE --noreftopo --temp 298.15 --gfn 2 --shake 1 --hmass 1 --dry
+  crest xtbopt.xyz --T 4 --v3 --ewin 12 --rthr 0.35 --ethr 0.2 --chrg $CHARGE --noreftopo --temp 298.15 --gfn 2 --shake 1 --hmass 1  
+  else
+  ## has constraint
+  ## run CREST constrain prep
+  crest $INPUTNAME --constrain $cinp
+  ## run CREST program
+  crest crest_input_copy.xyz --cinp .xcontrol.sample --subrmsd --T 4 --v3 --ewin 12 --rthr 0.35 --ethr 0.2 --chrg $CHARGE --noreftopo --temp 298.15 --gfn 2 --shake 1 --hmass 1 --dry
+  crest crest_input_copy.xyz --cinp .xcontrol.sample --subrmsd --T 4 --v3 --ewin 12 --rthr 0.35 --ethr 0.2 --chrg $CHARGE --noreftopo --temp 298.15 --gfn 2 --shake 1 --hmass 1  
+fi
+
+## Delete tmp files and copy file from local /tmp to NFS filesystem /home
+rm -f coord*
+rm -f cregen*
+rm -f cre_members
+rm -f gfnff*
+rm -f struc.xyz
+rm -f wbo
+cp -rf $JOB_RUN_DIR $INPUTDIR/
+rm -rf $JOB_RUN_DIR/
+

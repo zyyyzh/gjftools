@@ -1,0 +1,38 @@
+#!/bin/bash
+###User's Input File and Output File
+SYSTEMNAME=$JOBNAME.xyz
+FRAGNAME=$JOBNAME.txt
+OUTPUTNAME=$JOBNAME.log
+INPUTDIR=$DIR_NAME
+echo $HOSTNAME
+echo $INPUTDIR
+###Copy file to local filesystem /tmp
+JOB_RUN_DIR=/tmp/$USER/$JOB_ID
+mkdir -p $JOB_RUN_DIR
+
+/bin/cp  $INPUTDIR/$SYSTEMNAME $JOB_RUN_DIR/system.xyz
+/bin/cp  $INPUTDIR/$FRAGNAME $JOB_RUN_DIR/fragment.txt
+/bin/cp  $INPUTDIR/template.gjf $JOB_RUN_DIR/
+/bin/cp  $INPUTDIR/sobEDA.sh $JOB_RUN_DIR/
+
+cd $JOB_RUN_DIR
+
+## G16 enviroment
+g16root=/software/g16.b01
+source $g16root/g16/bsd/g16.profile
+export GAUSS_SCRDIR=$JOB_RUN_DIR 
+
+## Multiwfn environment
+ulimit -s unlimited
+export Multiwfnpath=/software/Multiwfn_3.8_dev_bin_Linux_noGUI
+export PATH=$PATH:/software/Multiwfn_3.8_dev_bin_Linux_noGUI
+
+./sobEDA.sh > $OUTPUTNAME
+
+## Copy file from local /tmp to NFS filesystem /home
+/bin/rm $JOB_RUN_DIR/Gau-*.rwf
+cp -rf $JOB_RUN_DIR $INPUTDIR/
+
+rm -rf $INPUTDIR/*o$JOB_ID
+rm -rf $INPUTDIR/*po$JOB_ID
+rm -rf $JOB_RUN_DIR/

@@ -1,0 +1,51 @@
+#!/bin/bash
+###User's Input File and Output File
+INPUTNAME=$JOBNAME.gjf
+CHKNAME=$JOBNAME.chk
+OUTPUTNAME=$JOBNAME.log
+INPUTDIR=$DIR_NAME
+echo $HOSTNAME
+echo $INPUTDIR
+###Copy file to local filesystem /tmp
+JOB_RUN_DIR=/tmp/$USER/$JOB_ID
+mkdir -p $JOB_RUN_DIR
+if [ -f $CHKNAME ]; then
+  /bin/cp $INPUTDIR/$CHKNAME $JOB_RUN_DIR/
+fi
+
+if [ -f $OUTPUTNAME ]; then
+  /bin/cp $INPUTDIR/$OUTPUTNAME $JOB_RUN_DIR/
+fi
+
+/bin/cp  $INPUTDIR/$INPUTNAME $JOB_RUN_DIR/
+/bin/cp  $INPUTDIR/xtb.sh $JOB_RUN_DIR/
+/bin/cp  $INPUTDIR/genxyz $JOB_RUN_DIR/
+/bin/cp  $INPUTDIR/extderi $JOB_RUN_DIR/
+
+cd $JOB_RUN_DIR
+
+## G09 enviroment
+g09root=/software/g09.e01
+source $g09root/g09/bsd/g09.profile
+export GAUSS_SCRDIR=$JOB_RUN_DIR 
+
+#xtb environment
+export PATH=$PATH:/software/xtb/bin
+export XTBPATH=/software/xtb/share/xtb
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OMP_STACKSIZE=1000m
+ulimit -s unlimited
+
+g09 <$INPUTNAME > $OUTPUTNAME
+for cfile in `ls *.chk`; do
+  formchk $cfile
+done
+
+## Copy file from local /tmp to NFS filesystem /home
+/bin/rm $JOB_RUN_DIR/Gau-*.rwf
+cp -rf $JOB_RUN_DIR $INPUTDIR/
+
+rm -rf $INPUTDIR/*o$JOB_ID
+rm -rf $INPUTDIR/*po$JOB_ID
+rm -rf $JOB_RUN_DIR/

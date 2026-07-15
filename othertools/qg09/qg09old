@@ -1,0 +1,219 @@
+# TODO: read PROC_NUM from input file automatically
+
+#! /bin/bash
+usageline='''Usage: [-p PROC_NUM(=4)] [-x ISXTB (gauxtb)] [-c ISCONFORMATION (rpipfmin)] [-t ISCREST] [-s ISsobEDA] [-a ISALL] [-f INPUTNAME] [-q FILTER_HOST] [-k need_autofix] [-k use_g16]'''
+
+while getopts p:xctsaf:q:kg OPT; do #选项后面的冒号表示该选项需要参数
+  case ${OPT} in
+    p) PROC_NUM=${OPTARG} #使用处理器数
+       ;;
+    x) ISXTB=${OPTIND} # 是否为xtb任务
+       ;;
+    c) ISCONFORMATION=${OPTIND} # 是否为cf任务
+       ;;
+    t) ISCREST=${OPTIND} # 是否为CREST任务
+       ;;
+    s) ISsobEDA=${OPTIND} # 是否为sobEDA任务
+       ;;
+    a) ISALL=${OPTIND} # 是否为全部提交
+       ;;
+    f) INPUTNAME=${OPTARG} #执行文件名
+       ;;
+    q) FILTER_HOST=${OPTARG} # 选择或忽略某个host
+       ;;
+    k) AUTOFIX=${OPTIND} # 是否执行autofix
+       ;;
+    g) G16=${OPTIND} # 是否使用g16
+       ;;
+    \?)
+      #  printf $usageline $(basename $0) >&2
+       echo $usageline
+       exit 1
+  esac
+done
+
+# detect job type
+if [ -z $ISXTB ]; then
+  ISXTB=0
+fi
+if [ -z $ISCONFORMATION ]; then
+  ISCONFORMATION=0
+fi
+if [ -z $ISCREST ]; then
+  ISCREST=0
+fi
+if [ -z $ISsobEDA ]; then
+  ISsobEDA=0
+fi
+if [ -z $ISALL ]; then
+  ISALL=0
+fi
+
+# if use g16
+if [ -z $G16 ]; then
+  gau_sub_file=g09yzh01
+else
+  gau_sub_file=g16yzh01
+fi
+
+# set default proc num according to job type
+if [ -z $PROC_NUM ]; then
+  if [ $ISXTB != 0 ]; then
+    PROC_NUM=1
+  elif [ $ISCONFORMATION != 0 ]; then
+    PROC_NUM=8
+  elif [ $ISCREST != 0 ]; then
+    PROC_NUM=4
+  elif [ $ISsobEDA != 0 ]; then
+    PROC_NUM=8
+  else
+    PROC_NUM=4
+  fi
+fi
+
+# no input file
+if [ $ISALL == 0 ] && [ -z $INPUTNAME ]; then
+  echo $usageline
+  exit 1
+fi
+
+# submit all
+if [ $ISALL != 0 ]; then
+  # crest jobs (xyz input)
+  if [ $ISCREST != 0 ]; then
+    for file in *.xyz; do
+      if [ ! -f ${file%.*}.o* ] && [ ! -f ${file%.*}.po* ]; then
+        INPUTNAME=$(basename $file)
+        JOBNAME=${INPUTNAME%.*}
+        DIR_NAME=$(dirname $INPUTNAME)
+        if [ $DIR_NAME = '.' ]; then
+          DIR_NAME=`pwd`
+        fi
+
+        printf "Input file directory: %s \n" $DIR_NAME
+        printf "Input file name: %s \n" $INPUTNAME
+        printf "Job name: %s \n" $JOBNAME
+        printf "Number of processors: %s \n" $PROC_NUM
+        if [ -z $FILTER_HOST ]; then
+          qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcrest01
+        else
+          qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcrest01
+        fi
+      fi
+    done
+  # sobEDA jobs (do not support)
+  elif [ $ISsobEDA != 0 ]; then
+    echo "sobEDA job do not support submit all function, please submit jobs manually!"
+    echo $usageline
+    exit 1
+  # other jobs (gjf input)
+  else
+    for file in *.gjf; do
+      if [ ! -f ${file%.*}.o* ] && [ ! -f ${file%.*}.po* ]; then
+        INPUTNAME=$(basename $file)
+        JOBNAME=${INPUTNAME%.*}
+        DIR_NAME=$(dirname $INPUTNAME)
+        if [ $DIR_NAME = '.' ]; then
+          DIR_NAME=`pwd`
+        fi
+
+        printf "Input file directory: %s \n" $DIR_NAME
+        printf "Input file name: %s \n" $INPUTNAME
+        printf "Job name: %s \n" $JOBNAME
+        printf "Number of processors: %s \n" $PROC_NUM
+        if [ $ISXTB != 0 ]; then
+          if [ -z $FILTER_HOST ]; then
+            qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09xtb01
+          else
+            qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09xtb01
+          fi
+        elif [ $ISCONFORMATION != 0 ]; then
+          if [ -z $FILTER_HOST ]; then
+            qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcf801
+          else
+            qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcf801
+          fi
+        else
+          if [ -z $AUTOFIX ]; then
+            if [ -z $FILTER_HOST ]; then
+              qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09yzh01fix
+            else
+              qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09yzh01fix
+            fi
+          else
+            if [ -z $FILTER_HOST ]; then
+              echo 'gausubfile: '$gau_sub_file
+              qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/$gau_sub_file
+            else
+              qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/$gau_sub_file
+            fi
+          fi
+        fi
+      fi
+    done
+  fi
+
+# submit one
+else
+  # define basic variables
+  FILENAME=$(basename $INPUTNAME)
+  JOBNAME=${FILENAME%.*}
+  DIR_NAME=$(dirname $INPUTNAME)
+  if [ $DIR_NAME = '.' ]; then
+    DIR_NAME=`pwd`
+  fi
+
+  printf "Input file directory: %s \n" $DIR_NAME
+  printf "Input file name: %s \n" $INPUTNAME
+  printf "Job name: %s \n" $JOBNAME
+  printf "Number of processors: %s \n" $PROC_NUM
+  # gau-xtb
+  if [ $ISXTB != 0 ]; then
+    if [ -z $FILTER_HOST ]; then
+      qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09xtb01
+    else
+      qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09xtb01
+    fi
+  # conformation search (rpipfmin)
+  elif [ $ISCONFORMATION != 0 ]; then
+    if [ -z $FILTER_HOST ]; then
+      qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcf801
+    else
+      qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcf801
+    fi
+  # crest
+  elif [ $ISCREST != 0 ]; then
+    if [ -z $FILTER_HOST ]; then
+      qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcrest01
+    else
+      qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/yzhcrest01
+    fi
+  # sobEDA
+  elif [ $ISsobEDA != 0 ]; then
+    if [ -z $FILTER_HOST ]; then
+      qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g16sobeda
+    else
+      qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g16sobeda
+    fi
+  # common g09 job
+  else
+    if [ -z $AUTOFIX ]; then
+      if [ -z $FILTER_HOST ]; then
+        echo 'gausubfile: '$gau_sub_file
+        qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09yzh01fix
+      else
+        qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09yzh01fix
+      fi
+    else
+      if [ -z $FILTER_HOST ]; then
+        echo 'gausubfile: '$gau_sub_file
+        qsub -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/$gau_sub_file
+      else
+        qsub -q all.q@$FILTER_HOST -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/$gau_sub_file
+      fi
+    fi
+  fi
+fi
+printf "\n"
+
+# qsub -q 'all.q@!g0409' -v JOBNAME=$JOBNAME,INPUTNAME=$INPUTNAME,DIR_NAME=$DIR_NAME -cwd -j y -S /bin/bash -pe smp $PROC_NUM -N $JOBNAME $(dirname $0)/g09xtb01
