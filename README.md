@@ -103,9 +103,37 @@ qg09 -p 8 -a -q !g0409
 ```bash
 python gauprocess.py
 ```
-功能为将当前文件夹下所有log文件和纯数字文件夹中的log文件集中于一个新的log文件夹中，并生成`gauprocess.csv`，其中包含各log文件的运行状态、关键计算结果。若有fchk文件，则会复制于一个新的fchk文件夹中。
+或
+```bash
+python -m gjftools.gauprocess
+```
 
-若指定`-c`参数，将会同时删除当前文件夹下所有带有同前缀.po文件而没有.o文件的gjf文件及其对应.po文件。
+**功能**：将当前文件夹及其纯数字子文件夹中所有 `.log` / `.out` 文件集中复制到 `log/` 文件夹，并生成 `gauprocess.csv`，汇总每个任务的运行状态和关键计算结果。若检测到有 `.fchk` 或 `.47` 文件，会自动分别复制到 `fchk/` 和 `file47/` 文件夹中。
+
+**CSV 输出字段**：
+
+| 字段 | 说明 |
+|------|------|
+| `file_name` | 文件名 |
+| `status` | 运行状态：`Normal`（正常终止）/ `Running`（运行中）/ `Error`（异常终止） |
+| `sp_energy` | 单点能（依次搜索 CCSD(T)/MP2/HF） |
+| `free_correction` | 吉布斯自由能热校正 |
+| `free_energy` | 电子+热自由能之和 |
+| `num_imag_freq` | 虚频数量（无频率信息时为 -1） |
+| `freq_cons` | 最小频率值 |
+| `tot_S` / `elec_S` / `trans_S` / `rot_S` / `vib_S` | 总/电子/平动/转动/振动熵 |
+| `opt_points` | 优化步数（异常/运行中任务） |
+| `converge_status` | 收敛判定数 0–4（异常/运行中任务） |
+
+**参数说明**：
+
+| 参数 | 说明 |
+|------|------|
+| `-c`, `--clean` | 删除已正常结束任务的相关文件（.log, .gjf, .o*, .po* 及作业目录） |
+| `-d`, `--deepclean` | 在 `-c` 基础上同时删除异常终止任务的文件 |
+| `-e`, `--error` | 将异常终止的 log 文件额外复制到 `log/error/` |
+| `-t`, `--time` | 打印各步骤耗时（文件复制、读取、解析等） |
+| `-y`, `--yes` | 对所有交互确认自动回答 yes（适用于批量脚本） |
 
 ### run_goodvibes
 

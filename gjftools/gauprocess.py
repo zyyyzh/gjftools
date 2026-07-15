@@ -181,10 +181,26 @@ def get_entropy(gauf):
     return tot_S, elec_S, trans_S, rot_S, vib_S
 
 
+def _scan_for_files(main_dir: str, extension: str) -> bool:
+    '''scan main_dir and its numbered subdirectories for files with given extension'''
+    for f in os.listdir(main_dir):
+        if f.endswith(extension):
+            return True
+    for d in os.listdir(main_dir):
+        dirpath = os.path.join(main_dir, d)
+        if d.isdigit() and os.path.isdir(dirpath):
+            try:
+                if any(f.endswith(extension) for f in os.listdir(dirpath)):
+                    return True
+            except PermissionError:
+                pass
+    return False
+
+
 def main(main_dir: str=os.getcwd(),
          clean: bool=False,
-         need_fchk: bool=False,
-         need_file47: bool=False,
+         need_fchk: bool=None,
+         need_file47: bool=None,
          need_time: bool=False,
          need_error: bool=False,
          deepclean: bool=False,
@@ -226,6 +242,12 @@ def main(main_dir: str=os.getcwd(),
                 os.system(f'mv log log_{int(time.time()*100)}')
     os.makedirs('log', exist_ok=True)
 
+    # Auto-detect .fchk and .47 files if not explicitly set
+    if need_fchk is None:
+        need_fchk = _scan_for_files(main_dir, '.fchk')
+    if need_file47 is None:
+        need_file47 = _scan_for_files(main_dir, '.47')
+
     if need_fchk:
         if os.path.exists('fchk'):
             if all_yes:
@@ -241,14 +263,14 @@ def main(main_dir: str=os.getcwd(),
     if need_file47:
         if os.path.exists('file47'):
             if all_yes:
-                os.system('rm -rf fchk')
+                os.system('rm -rf file47')
             else:
                 print('Warning: old file47 folder exists!')
                 need_remove = input('Do you want delete old file47? (y/n)')
                 if need_remove == 'y':
                     os.system('rm -rf file47')
                 else:
-                    os.system(f'mv file47 fchk_{int(time.time()*100)}')
+                    os.system(f'mv file47 file47_{int(time.time()*100)}')
         os.makedirs('file47', exist_ok=True)
     if need_error:
         os.makedirs('log/error', exist_ok=True)
@@ -405,20 +427,6 @@ def parse_args():
         help='remove finished job files and error job files (default: False)',
     )
     p.add_argument(
-        '--fchk', '-k',
-        action='store_const',
-        const=True,
-        default=False,
-        help='get fchk files (default: False)',
-    )
-    p.add_argument(
-        '--file47', '-s',
-        action='store_const',
-        const=True,
-        default=False,
-        help='get 47 files (default: False)',
-    )
-    p.add_argument(
         '--time', '-t',
         action='store_const',
         const=True,
@@ -446,8 +454,6 @@ if __name__ == '__main__':
     args = parse_args()
 
     main(clean=args.clean,
-         need_fchk=args.fchk,
-         need_file47=args.file47,
          need_time=args.time,
          need_error=args.error,
          deepclean=args.deepclean,

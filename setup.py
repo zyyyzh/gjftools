@@ -14,5 +14,5 @@ setup(
     packages=find_packages(include=['gjftools']),
     package_data={'': []},
     include_package_data=True,
-    version='0.1.5',
+    version='0.1.6',
 )
